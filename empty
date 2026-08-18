@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# Global variable to hold the delete flag status
+DELETE_FLAG=0
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+  -d | --delete)
+    DELETE_FLAG=1
+    shift
+    ;;
+  *)
+    TARGET_DIR="$1"
+    shift
+    ;;
+  esac
+done
+
+main() {
+  local dir="$1"
+  local has_error=0 # Track if we found any non-empty files
+
+  # Prevent the literal "dir/*" bug if the directory is empty
+  shopt -s nullglob
+
+  for file in "$dir"/*; do
+    if [[ -d "$file" ]]; then
+      # Check if the directory itself is empty
+      # (If nullglob is on, an empty dir yields 0 items in the subshell)
+      if [[ -z "$(ls -A "$file" 2>/dev/null)" ]]; then
+        echo "Directory '$file' is empty"
+        if [[ "$DELETE_FLAG" -eq 1 ]]; then
+          rmdir "$file" && echo "Deleted empty directory: $file"
+        fi
+      else
+        # Recursively call main. Capture the return code!
+        if ! main "$file"; then
+          has_error=1
+        fi
+      fi
+    else
+      # It's a regular file. -s means "size > 0"
+      if [[ -s "$file" ]]; then
+        echo "File '$file' is NOT empty"
+        has_error=1
+      else
+        echo "File '$file' is empty"
+        if [[ "$DELETE_FLAG" -eq 1 ]]; then
+          rm "$file" && echo "Deleted empty file: $file"
+        fi
+      fi
+    fi
+  done
+
+  # Return the accumulated status after checking ALL files
+  return $has_error
+}
+
+# Check if a directory was actually provided
+if [[ -z "$TARGET_DIR" ]]; then
+  echo "Usage: $0 [-d|--delete] <directory>"
+  exit 1
+fi
+
+# Start the recursive loop
+main "$TARGET_DIR"

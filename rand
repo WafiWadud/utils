@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# (Note: /dev/random blocks when entropy is low. Change to /dev/urandom if it hangs).
+RNG_DEV="/dev/random"
+
+# Helper: Get a raw 64-bit unsigned integer from /dev/random.
+# od's "u" conversion is unsigned internally, so this string is a correct
+# full-range value from 0 to 18446744073709551615. Don't touch it with
+# bash's $(( )) though -- that's SIGNED 64-bit, so anything with the top
+# bit set (~half of all draws) silently wraps negative. Pipe it through
+# bc instead wherever it needs arithmetic (see cmd_int/cmd_choice).
+_get_raw_rand() {
+  head -c 8 "$RNG_DEV" | od -An -tu8 | tr -d ' '
+}
+
+# ---------------------------------------------------------
+# SUBCOMMAND: int
+# ---------------------------------------------------------
+cmd_int() {
+  local lower=0
+  local upper=100
+
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+    -l | --lower)
+      lower="$2"
+      shift 2
+      ;;
+    -u | --upper)
+      upper="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown flag for 'int': $1" >&2
+      exit 1
+      ;;
+    esac
+  done
+
+  # User-friendly: swap if they pass them backwards
+  if ((lower > upper)); then
+    local tmp="$lower"
+    lower="$upper"
+    upper="$tmp"
+  fi
+
+  local range=$((upper - lower + 1))
+  local raw_rand
+  raw_rand=$(_get_raw_rand)
+
+  # Calculate and print
+  echo "$lower + ($raw_rand % $range)" | bc
+}
+
+# ---------------------------------------------------------
+# SUBCOMMAND: hex
+# ---------------------------------------------------------
+cmd_hex() {
+  local bytes=32
+
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+    -b | --bytes)
+      bytes="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown flag for 'hex': $1" >&2
+      exit 1
+      ;;
+    esac
+  done
+
+  if ! [[ "$bytes" =~ ^[0-9]+$ ]] || ((bytes == 0)); then
+    echo "Error: --bytes must be a positive integer." >&2
+    exit 1
+  fi
+
+  # Read bytes, convert to hex, strip whitespace/newlines
+  head -c "$bytes" "$RNG_DEV" | od -An -tx1 | tr -d ' \n'
+  echo # Print a trailing newline for clean terminal output
+}
+
+# ---------------------------------------------------------
+# SUBCOMMAND: bytes
+# ---------------------------------------------------------
+cmd_bytes() {
+  if [[ -z "${1:-}" ]]; then
+    echo "Error: 'bytes' requires a size (e.g., 10b, 5k, 2m, 1g)." >&2
+    exit 1
+  fi
+
+  local input="$1"
+  local num="${input%[a-zA-Z]}"  # Strip the letter suffix
+  local suffix="${input#"$num"}" # Isolate the letter suffix
+
+  if ! [[ "$num" =~ ^[0-9]+$ ]] || [[ -z "$suffix" ]]; then
+    echo "Error: Invalid format '$input'. Use e.g., 512b, 1k, 10m." >&2
+    exit 1
+  fi
+
+  local total_bytes
+  case "$suffix" in
+  b | B) total_bytes="$num" ;;
+  k | K) total_bytes=$((num * 1024)) ;;
+  m | M) total_bytes=$((num * 1024 * 1024)) ;;
+  g | G) total_bytes=$((num * 1024 * 1024 * 1024)) ;;
+  *)
+    echo "Error: Unknown suffix '$suffix'. Use b, k, m, or g." >&2
+    exit 1
+    ;;
+  esac
+
+  # Output raw binary directly to stdout
+  head -c "$total_bytes" "$RNG_DEV"
+}
+
+# ---------------------------------------------------------
+# SUBCOMMAND: choice
+# ---------------------------------------------------------
+cmd_choice() {
+  if [[ "$#" -eq 0 ]]; then
+    echo "Error: 'choice' requires at least one argument to choose from." >&2
+    exit 1
+  fi
+
+  local args=("$@")
+  local count=${#args[@]}
+  local raw_rand
+  local idx
+
+  raw_rand=$(_get_raw_rand)
+  idx=$(echo "$raw_rand % $count" | bc)
+
+  echo "${args[$idx]}"
+}
+
+# ---------------------------------------------------------
+# Main Router
+# ---------------------------------------------------------
+usage() {
+  cat <<EOF
+Usage: rand <command> [options]
+
+Commands:
+  int     Generate a random integer.
+           Options: [-l|--lower N] [-u|--upper N] (Defaults: 0 to 100)
+
+  hex     Generate a random hex string.
+           Options: [-b|--bytes N] (Defaults: 32 bytes)
+
+  bytes   Output raw random bytes to stdout.
+           Argument: <size> (e.g., 10b, 5k, 2m, 1g)
+
+  choice  Pick a random argument from the provided list.
+           Arguments: <item1> <item2> ...
+EOF
+  exit 1
+}
+
+# Check if at least one argument was passed
+if [[ $# -eq 0 ]]; then
+  usage
+fi
+
+# Route to the correct subcommand
+case "$1" in
+int)
+  shift
+  cmd_int "$@"
+  ;;
+hex)
+  shift
+  cmd_hex "$@"
+  ;;
+bytes)
+  shift
+  cmd_bytes "$@"
+  ;;
+choice)
+  shift
+  cmd_choice "$@"
+  ;;
+-h | --help | help) usage ;;
+*)
+  echo "Error: Unknown command '$1'." >&2
+  usage
+  ;;
+esac

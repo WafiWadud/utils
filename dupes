@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+set -eu
+
+DELETE_FLAG=0
+TARGET_DIR=""
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+  -d | --delete)
+    DELETE_FLAG=1
+    shift
+    ;;
+  *)
+    TARGET_DIR="$1"
+    shift
+    ;;
+  esac
+done
+
+if [[ -z "$TARGET_DIR" ]]; then
+  echo "Usage: $0 [-d|--delete] <directory>"
+  exit 1
+fi
+
+# Array to hold our file data
+FILE_DATA=()
+
+# Recursive traversal (matches your original util structure)
+traverse() {
+  local dir="$1"
+  shopt -s nullglob
+
+  for file in "$dir"/*; do
+    # Only process actual files, ignore symlinks to prevent false duplicates
+    if [[ -d "$file" ]]; then
+      traverse "$file"
+    elif [[ -f "$file" && ! -L "$file" ]]; then
+      # Get hash and modification time (epoch seconds)
+      local hash
+      local mtime
+      hash=$(md5sum "$file" | awk '{print $1}')
+      mtime=$(stat -c '%Y' "$file")
+
+      # Store as: HASH \t MTIME \t FILEPATH
+      FILE_DATA+=("$hash"$'\t'"$mtime"$'\t'"$file")
+    fi
+  done
+}
+
+traverse "$TARGET_DIR"
+
+if [[ ${#FILE_DATA[@]} -eq 0 ]]; then
+  echo "No files found."
+  exit 0
+fi
+
+# Process the data
+current_hash=""
+dupe_count=0
+
+# We use Process Substitution < <(...) instead of a pipe | to preserve the dupe_count variable
+# Sort by Hash (col 1), then by Time ascending (col 2) so the oldest file is encountered first
+while IFS=$'\t' read -r hash mtime file; do
+  if [[ -n "$current_hash" && "$hash" == "$current_hash" ]]; then
+    echo "Duplicate found: '$file'"
+    ((dupe_count++))
+
+    if [[ "$DELETE_FLAG" -eq 1 ]]; then
+      rm "$file" && echo "  -> Deleted."
+    fi
+  else
+    # New hash encountered, this is the original (oldest due to sort)
+    current_hash="$hash"
+  fi
+done < <(printf '%s\n' "${FILE_DATA[@]}" | sort -t$'\t' -k1,1 -k2,2n)
+
+echo "--------------------------------"
+echo "Total duplicates found: $dupe_count"
+
+# Return 1 if duplicates were found, 0 if clean
+[[ $dupe_count -gt 0 ]] && exit 1 || exit 0

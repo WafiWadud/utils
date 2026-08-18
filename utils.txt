@@ -1,0 +1,11 @@
+#!/usr/bin/env cat
+dupes - counts all duplicate files in a directory (has a flag which deletes the duplicate) (sorts by date)
+recent - shows all recently modified files in a directory.
+empty - shows all empty directories/files in a directory. (has a flag which deletes the empty files/directories) (sorts by date)
+path - Tool to manipulate $PATH. Has list, add and remove.
+loc - Lines of code based on different delims. (":", ";", "\n") etc.
+deps - recursively calls ldd on a binary to find all dependencies.
+timer - set a timer to run a command after a specified time. (Could be a notif, could be just about anything)
+rand - Random data generator. Has int (specify lower and upper bound), hex (specify how many bytes), bytes (same as before, but in bytes, megs, gigs, etc.), choice (picks a random argument from the list of arguments given to the command).
+freq - sorts data by frequency. (data in from stdin)
+retry - Retries a command until it succeeds. (Has an option to make it retry only a certain amount of times)

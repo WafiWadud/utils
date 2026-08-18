@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# Reads data from stdin or a file(s), extracts words, and sorts by frequency.
+# Usage:
+#   freq filename.txt
+#   cat filename.txt | freq
+#   echo "hello world hello" | freq
+
+# Check for help flag BEFORE running main.
+# We use 'exit 0' so it stops the script completely.
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  printf "Usage:\n"
+  printf "\t freq filename.txt\n"
+  printf "\t cat filename.txt | freq\n"
+  printf "\t echo \"hello world hello\" | freq\n"
+  exit 0
+fi
+
+main() {
+  # If $@ contains files, cat opens them.
+  # If $@ is empty, cat automatically reads from stdin (piping).
+  cat "$@" |
+    # 1. Replace all non-alphanumeric characters (and underscores) with newlines
+    # -c: complement (match the opposite of the set)
+    # -s: squeeze (replace multiple consecutive newlines with a single newline)
+    tr -cs 'a-zA-Z0-9_' '\n' |
+    # 2. Sort all words alphabetically (required before uniq)
+    sort |
+    # 3. Count consecutive identical lines (prefixes lines with the count)
+    uniq -c |
+    # 4. Sort numerically (-n) in reverse/descending order (-r) so highest frequency is at the top
+    sort -nr
+}
+
+# Pass the original, untouched arguments to main
+main "$@"

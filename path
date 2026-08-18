@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -eu
+
+usage() {
+  printf "Usage: path [add|list|remove]\n"
+  return 1
+}
+
+list-path() {
+  local path
+  path="${PATH//:/ }"
+  # Print each line.
+  for p in $path; do
+    printf "%s\n" "$p"
+  done
+}
+
+append-path() {
+  export PATH="$PATH:$1"
+}
+
+remove-path() {
+  export PATH="${PATH//$1:/}"
+}
+
+main() {
+  # Get arguments.
+  # there are three: add, list and remove
+  case "$1" in
+  add) append-path "$2" ;;
+  list) list-path ;;
+  remove) remove-path "$2" ;;
+  *) usage ;;
+  esac
+}
+
+main "$@"

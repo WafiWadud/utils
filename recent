@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+set -eu
+
+DAYS=1
+TARGET_DIR=""
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+  -d | --days)
+    # Validate that the next argument is a number
+    if [[ "$2" =~ ^[0-9]+$ ]]; then
+      DAYS="$2"
+      shift 2
+    else
+      echo "Error: -d/--days requires a numeric argument."
+      exit 1
+    fi
+    ;;
+  *)
+    TARGET_DIR="$1"
+    shift
+    ;;
+  esac
+done
+
+if [[ -z "$TARGET_DIR" ]]; then
+  echo "Usage: $0 [-d|--days N] <directory>"
+  exit 1
+fi
+
+NOW=$(date +%s)
+SECONDS_AGO=$((DAYS * 86400))
+CUTOFF=$((NOW - SECONDS_AGO))
+
+# Array to hold recent files
+RECENT_FILES=()
+
+# Recursive traversal
+traverse() {
+  local dir="$1"
+  shopt -s nullglob
+
+  for file in "$dir"/*; do
+    if [[ -d "$file" ]]; then
+      traverse "$file"
+    elif [[ -f "$file" && ! -L "$file" ]]; then
+      local mtime
+      mtime=$(stat -c '%Y' "$file")
+
+      # If modified after our cutoff time, save it
+      if ((mtime >= CUTOFF)); then
+        # Store as: MTIME \t FILEPATH
+        RECENT_FILES+=("$mtime"$'\t'"$file")
+      fi
+    fi
+  done
+}
+
+traverse "$TARGET_DIR"
+
+if [[ ${#RECENT_FILES[@]} -eq 0 ]]; then
+  echo "No files modified in the last $DAYS day(s)."
+  exit 0
+fi
+
+# Sort by MTIME descending (newest first) and print nicely
+while IFS=$'\t' read -r mtime file; do
+  # Convert epoch seconds to a human-readable format
+  date_str=$(date -d @"$mtime" '+%Y-%m-%d %H:%M:%S')
+  echo "[$date_str] $file"
+done < <(printf '%s\n' "${RECENT_FILES[@]}" | sort -t$'\t' -k1,1nr)
+
+exit 0

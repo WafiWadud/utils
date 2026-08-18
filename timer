@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# ./timer -t <time> <command>
+# Time is specified in the format of 1h, 1m, 1s (e.g., 1h30m, 90s, 1h45s)
+
+TIME=0
+COMMAND=()
+
+# Helper function to parse h/m/s into seconds
+parse_time() {
+  local input="$1"
+
+  # Use regex to find numbers followed by h, m, or s
+  while [[ "$input" =~ ([0-9]+)([hms]) ]]; do
+    local num="${BASH_REMATCH[1]}"
+    local unit="${BASH_REMATCH[2]}"
+
+    case "$unit" in
+    h) ((TIME += num * 3600)) ;;
+    m) ((TIME += num * 60)) ;;
+    s) ((TIME += num)) ;;
+    esac
+
+    # Strip the matched part from the string and loop again for the next chunk
+    input="${input#"${BASH_REMATCH[0]}"}"
+  done
+
+  # If TIME is still 0, they passed a bad format
+  if [[ "$TIME" -eq 0 ]]; then
+    echo "Error: Invalid time format. Use e.g., 1h, 30m, 10s, 1h30m." >&2
+    exit 1
+  fi
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+  -t | --time)
+    # Safety check to make sure they actually provided a time
+    if [[ -z "$2" || "$2" == -* ]]; then
+      echo "Error: $1 requires a time value." >&2
+      exit 1
+    fi
+    parse_time "$2"
+    shift 2
+    ;;
+  *)
+    COMMAND+=("$1")
+    shift
+    ;;
+  esac
+done
+
+main() {
+  # Make sure they actually passed a command to run
+  if [[ ${#COMMAND[@]} -eq 0 ]]; then
+    echo "Error: No command specified." >&2
+    exit 1
+  fi
+
+  sleep "$TIME"
+  "${COMMAND[@]}"
+}
+
+main
