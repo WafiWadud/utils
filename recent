@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 DAYS=1
 TARGET_DIR=""
 

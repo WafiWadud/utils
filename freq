@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 # Reads data from stdin or a file(s), extracts words, and sorts by frequency.
 # Usage:
 #   freq filename.txt

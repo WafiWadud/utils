@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 DELETE_FLAG=0
 TARGET_DIR=""
 

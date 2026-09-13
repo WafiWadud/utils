@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 # Global variable to hold the delete flag status
 DELETE_FLAG=0
 

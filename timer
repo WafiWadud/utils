@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 # ./timer -t <time> <command>
 # Time is specified in the format of 1h, 1m, 1s (e.g., 1h30m, 90s, 1h45s)
 

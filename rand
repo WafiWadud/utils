@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 # (Note: /dev/random blocks when entropy is low. Change to /dev/urandom if it hangs).
 RNG_DEV="/dev/random"
 

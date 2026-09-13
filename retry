@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 ATTEMPTS=0 # 0 is infinity
 COMMAND=()
 
