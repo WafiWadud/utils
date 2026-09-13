@@ -26,7 +26,7 @@ main() {
       exit 0
     fi
 
-    ((attempt++))
+    ((++attempt))
 
   done
 
